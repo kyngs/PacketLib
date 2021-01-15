@@ -27,7 +27,7 @@ public abstract class PacketProtocol {
             Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
             unsafeField.setAccessible(true);
             unsafe = (Unsafe) unsafeField.get(null);
-        } catch (NoSuchFieldException | IllegalAccessException | IllegalArgumentException | ClassCastException e) {
+        } catch (Exception e) {
             unsafe = null;
         }
         UNSAFE = unsafe;
