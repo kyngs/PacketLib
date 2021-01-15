@@ -4,16 +4,35 @@ import com.github.steveice10.packetlib.Client;
 import com.github.steveice10.packetlib.Server;
 import com.github.steveice10.packetlib.Session;
 import com.github.steveice10.packetlib.crypt.PacketEncryption;
+import edu.umd.cs.findbugs.annotations.Nullable;
+import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * A protocol for packet sending and receiving.
- * All implementations must have a no-params constructor for server protocol creation.
+ * All implementations must have a no-params constructor for server protocol creation, if the unsafe failed to instantiate. (Example: Running on Android)
  */
 public abstract class PacketProtocol {
+
+    @Nullable
+    private static final Unsafe UNSAFE;
+
+    static {
+        Unsafe unsafe;
+        try{
+            Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+            unsafeField.setAccessible(true);
+            unsafe = (Unsafe) unsafeField.get(null);
+        } catch (NoSuchFieldException | IllegalAccessException | IllegalArgumentException | ClassCastException e) {
+            unsafe = null;
+        }
+        UNSAFE = unsafe;
+    }
+
     private final Map<Integer, Class<? extends Packet>> incoming = new HashMap<>();
     private final Map<Class<? extends Packet>, Integer> outgoing = new HashMap<>();
 
@@ -117,6 +136,14 @@ public abstract class PacketProtocol {
         Class<? extends Packet> packet = this.incoming.get(id);
         if (packet == null) {
             throw new IllegalArgumentException("Invalid packet id: " + id);
+        }
+
+        if (UNSAFE != null){ //If we failed to get unsafe, code will use the "normal" way to create instance of the Packet.
+            try {
+                return (Packet) UNSAFE.allocateInstance(packet);
+            } catch (Exception e) {
+                //Proceed to create instance the "normal" way.
+            }
         }
 
         try {
